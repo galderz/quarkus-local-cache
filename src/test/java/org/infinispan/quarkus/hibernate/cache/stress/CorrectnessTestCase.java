@@ -33,7 +33,6 @@ import org.hibernate.testing.BeforeClassOnce;
 import org.hibernate.testing.jta.JtaAwareConnectionProviderImpl;
 import org.hibernate.testing.jta.TestingJtaPlatformImpl;
 import org.hibernate.testing.junit4.CustomParameterized;
-import org.infinispan.quarkus.hibernate.cache.PutFromLoadValidator;
 import org.infinispan.quarkus.hibernate.cache.QuarkusInfinispanRegionFactory;
 import org.infinispan.quarkus.hibernate.cache.stress.entities.Address;
 import org.infinispan.quarkus.hibernate.cache.stress.entities.Family;
@@ -305,7 +304,6 @@ public abstract class CorrectnessTestCase {
         for (Future<Void> f : futures) {
             f.get(); // check for exceptions
         }
-        checkForEmptyPendingPuts();
         log.infof("Generated %d timestamps%n", timestampGenerator.get());
         AtomicInteger created = new AtomicInteger();
         AtomicInteger removed = new AtomicInteger();
@@ -355,48 +353,6 @@ public abstract class CorrectnessTestCase {
 
         public Object getPendingPutMap() {
             return map.get(key);
-        }
-    }
-
-    protected void checkForEmptyPendingPuts() throws Exception {
-        Field pp = PutFromLoadValidator.class.getDeclaredField("pendingPuts");
-        pp.setAccessible(true);
-        Method getInvalidators = null;
-        List<DelayedInvalidators> delayed = new LinkedList<>();
-
-        SessionFactoryImplementor sfi = (SessionFactoryImplementor) sessionFactory;
-        for (Object regionName : sfi.getCache().getCacheRegionNames()) {
-            PutFromLoadValidator validator = getPutFromLoadValidator(sfi, (String) regionName);
-            if (validator == null) {
-                log.warn("No validator for " + regionName);
-                continue;
-            }
-            ConcurrentMap<Object, Object> map = ((com.github.benmanes.caffeine.cache.Cache) pp.get(validator)).asMap();
-            for (Iterator<Map.Entry<Object, Object>> iterator = map.entrySet().iterator(); iterator.hasNext(); ) {
-                Map.Entry entry = iterator.next();
-                if (getInvalidators == null) {
-                    getInvalidators = entry.getValue().getClass().getMethod("getInvalidators");
-                    getInvalidators.setAccessible(true);
-                }
-                java.util.Collection invalidators = (java.util.Collection) getInvalidators.invoke(entry.getValue());
-                if (invalidators != null && !invalidators.isEmpty()) {
-                    delayed.add(new DelayedInvalidators(map, entry.getKey()));
-                }
-            }
-        }
-        // poll until all invalidations come
-        long deadline = System.currentTimeMillis() + 30000;
-        while (System.currentTimeMillis() < deadline) {
-            iterateInvalidators(delayed, getInvalidators, (k, i) -> {
-            });
-            if (delayed.isEmpty()) {
-                break;
-            }
-            Thread.sleep(1000);
-        }
-        if (!delayed.isEmpty()) {
-            iterateInvalidators(delayed, getInvalidators, (k, i) -> log.warnf("Left invalidators on key %s: %s", k, i));
-            throw new IllegalStateException("Invalidators were not cleared: " + delayed.size());
         }
     }
 
@@ -870,25 +826,6 @@ public abstract class CorrectnessTestCase {
             log.trace("Invalidating all caches");
             sessionFactory.getCache().evictAllRegions();
         }
-    }
-
-    private PutFromLoadValidator getPutFromLoadValidator(SessionFactoryImplementor sfi, String regionName) throws IllegalAccessException {
-        Region region = sfi.getCache().getRegion(regionName);
-        if (region == null) {
-            return null;
-        }
-        Field validatorField = getField(region.getClass(), "validator");
-        if (validatorField == null) {
-            return null;
-        }
-
-        Object validator = validatorField.get(region);
-        if (validator == null) {
-            return null;
-        }
-
-        // Non-null in strict data access patterns
-        return (PutFromLoadValidator) validator;
     }
 
     private Field getField(Class<?> clazz, String fieldName) {

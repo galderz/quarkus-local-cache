@@ -16,12 +16,10 @@ public final class StrictDataAccess implements InternalDataAccess {
     private static final boolean trace = log.isTraceEnabled();
 
     private final InternalCache cache;
-    private final PutFromLoadValidator putValidator;
     private final InternalRegion internalRegion;
 
-    StrictDataAccess(InternalCache cache, PutFromLoadValidator putValidator, InternalRegion internalRegion) {
+    StrictDataAccess(InternalCache cache, InternalRegion internalRegion) {
         this.cache = cache;
-        this.putValidator = putValidator;
         this.internalRegion = internalRegion;
     }
 
@@ -33,11 +31,7 @@ public final class StrictDataAccess implements InternalDataAccess {
             }
             return null;
         }
-        final Object val = cache.getOrNull(key);
-        if (val == null && session != null) {
-            putValidator.registerPendingPut(session, key, txTimestamp);
-        }
-        return val;
+        return cache.getOrNull(key);
     }
 
     @Override
@@ -58,19 +52,7 @@ public final class StrictDataAccess implements InternalDataAccess {
             return false;
         }
 
-        PutFromLoadValidator.Lock lock = putValidator.acquirePutFromLoadLock(session, key, txTimestamp);
-        if (lock == null) {
-            if (trace) {
-                log.tracef("Put from load lock not acquired for key %s", key);
-            }
-            return false;
-        }
-
-        try {
-            cache.putIfAbsent(key, value);
-        } finally {
-            putValidator.releasePutFromLoadLock(key, lock);
-        }
+        cache.putIfAbsent(key, value);
 
         return true;
     }
@@ -101,14 +83,7 @@ public final class StrictDataAccess implements InternalDataAccess {
 
     @Override
     public void removeAll() {
-        try {
-            if (!putValidator.beginInvalidatingRegion()) {
-                log.error("Failed to invalidate pending putFromLoad calls for region " + internalRegion.getName());
-            }
-            cache.invalidateAll();
-        } finally {
-            putValidator.endInvalidatingRegion();
-        }
+        cache.invalidateAll();
     }
 
     @Override
@@ -118,16 +93,8 @@ public final class StrictDataAccess implements InternalDataAccess {
 
     @Override
     public void evictAll() {
-        try {
-            if (!putValidator.beginInvalidatingRegion()) {
-                log.error("Failed to invalidate pending putFromLoad calls for region " + internalRegion.getName());
-            }
-
-            // Invalidate the local region
-            internalRegion.clear();
-        } finally {
-            putValidator.endInvalidatingRegion();
-        }
+        // Invalidate the local region
+        internalRegion.clear();
     }
 
     @Override
@@ -141,61 +108,7 @@ public final class StrictDataAccess implements InternalDataAccess {
     }
 
     private void write(Object session, Object key, Object value) {
-        // We need to be invalidating even for regular writes; if we were not and the write was followed by eviction
-        // (or any other invalidation), naked put that was started after the eviction ended but before this insert/update
-        // ended could insert the stale entry into the cache (since the entry was removed by eviction).
-        // Lock owner is not serialized in local mode so we can use anything (only equals and hashCode are needed)
-        Object lockOwner = new Object();
-        registerLocalInvalidation(session, lockOwner, key);
-        if (!putValidator.beginInvalidatingWithPFER(lockOwner, key, value)) {
-            throw new CacheException(String.format(
-                    "Failed to invalidate pending putFromLoad calls for key %s from region %s"
-                    , key, internalRegion.getName()
-            ));
-        }
-        // Make use of the simple cache mode here
         cache.invalidate(key);
-    }
-
-    protected void registerLocalInvalidation(Object session, Object lockOwner, Object key) {
-        TransactionCoordinator transactionCoordinator = ((SharedSessionContractImplementor) session).getTransactionCoordinator();
-        if (transactionCoordinator == null) {
-            return;
-        }
-        if (trace) {
-            log.tracef("Registering synchronization on transaction in %s, cache %s: %s", lockOwner, internalRegion.getName(), key);
-        }
-        transactionCoordinator.getLocalSynchronizations()
-                .registerSynchronization(new LocalInvalidationSynchronization(putValidator, key, lockOwner));
-    }
-
-    private static final class LocalInvalidationSynchronization implements Synchronization {
-        private static final Logger log = Logger.getLogger(LocalInvalidationSynchronization.class);
-        private final static boolean trace = log.isTraceEnabled();
-
-        private final Object lockOwner;
-        private final PutFromLoadValidator validator;
-        private final Object key;
-
-        public LocalInvalidationSynchronization(PutFromLoadValidator validator, Object key, Object lockOwner) {
-            assert lockOwner != null;
-            this.validator = validator;
-            this.key = key;
-            this.lockOwner = lockOwner;
-        }
-
-        @Override
-        public void beforeCompletion() {
-        }
-
-        @Override
-        public void afterCompletion(int status) {
-            if (trace) {
-                log.tracef("After completion callback with status %d", status);
-            }
-            validator.endInvalidatingKey(lockOwner, key, status == Status.STATUS_COMMITTED || status == Status.STATUS_COMMITTING);
-        }
-
     }
 
 }

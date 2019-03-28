@@ -30,7 +30,6 @@ final class DomainDataRegionImpl implements DomainDataRegion, ExtendedStatistics
     private final InternalRegion internalRegion;
 
     private Strategy strategy;
-    private PutFromLoadValidator validator;
     private Predicate<Map.Entry> filter;
 
     @Override
@@ -93,7 +92,7 @@ final class DomainDataRegionImpl implements DomainDataRegion, ExtendedStatistics
             return new NonStrictDataAccess(cache, internalRegion, comparator, regionFactory);
         } else {
             prepareForValidation();
-            return new StrictDataAccess(cache, validator, internalRegion);
+            return new StrictDataAccess(cache, internalRegion);
         }
     }
 
@@ -102,7 +101,6 @@ final class DomainDataRegionImpl implements DomainDataRegion, ExtendedStatistics
             assert strategy == Strategy.VALIDATION;
             return;
         }
-        validator = new PutFromLoadValidator(cache, config.getRegionName(), regionFactory);
         strategy = Strategy.VALIDATION;
     }
 
