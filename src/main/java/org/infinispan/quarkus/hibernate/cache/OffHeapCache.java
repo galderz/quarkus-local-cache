@@ -31,8 +31,8 @@ final class OffHeapCache implements InternalCache {
     }
 
     @Override
-    public long size() {
-        return container.size();
+    public long count() {
+        return container.count();
     }
 
     @Override

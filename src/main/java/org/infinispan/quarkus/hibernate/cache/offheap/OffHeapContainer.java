@@ -18,7 +18,7 @@ public final class OffHeapContainer {
 
     private final Function<byte[], byte[]> GET_BYTES = this::getBytes;
 
-    private final AtomicLong size = new AtomicLong();
+    private final AtomicLong count = new AtomicLong();
 
     private final StripedLock locks;
     private final int memoryAddressCount;
@@ -67,7 +67,7 @@ public final class OffHeapContainer {
         try {
             checkDeallocation();
             deallocateAll();
-            size.set(0);
+            count.set(0);
         } finally {
             locks.unlockAll();
         }
@@ -173,7 +173,7 @@ public final class OffHeapContainer {
         // Have to start new linked node list
         if (bucketAddress == 0) {
             bucketMemory.putBucketAddress(key, entryAddress);
-            size.incrementAndGet();
+            count.incrementAndGet();
         } else {
             boolean replaceHead = false;
             boolean foundPrevious = false;
@@ -211,7 +211,7 @@ public final class OffHeapContainer {
             }
             // If we didn't find the key previous, it means we are a new entry
             if (!foundPrevious) {
-                size.incrementAndGet();
+                count.incrementAndGet();
             }
             if (replaceHead) {
                 bucketMemory.putBucketAddress(key, entryAddress);
@@ -222,8 +222,8 @@ public final class OffHeapContainer {
         }
     }
 
-    public long size() {
-        return size.get();
+    public long count() {
+        return count.get();
     }
 
     public void invalidate(Object key) {
@@ -259,7 +259,7 @@ public final class OffHeapContainer {
                 } else {
                     bucketMemory.putBucketAddress(key, nextAddress);
                 }
-                size.decrementAndGet();
+                count.decrementAndGet();
                 break;
             }
             prevAddress = address;

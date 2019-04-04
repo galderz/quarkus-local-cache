@@ -76,7 +76,7 @@ final class CaffeineCache implements InternalCache {
     }
 
     @Override
-    public long size() {
+    public long count() {
         // Size calculated for stats, so try to get as accurate count as possible
         // by performing any cleanup operations before returning the result
         cache.cleanUp();

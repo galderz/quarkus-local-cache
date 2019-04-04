@@ -29,13 +29,6 @@ public class CacheRegionEvictTest {
         getCacheNotFound(session, cacheAccess);
 
         putFromLoad(cacheAccess, session);
-        assertEquals(0, testing.region().getElementCountInMemory());
-        getCacheNotFound(session, cacheAccess);
-
-        // Advance transaction time so it happens after region eviction
-        testing.regionTimeService.advance(1, TimeUnit.MILLISECONDS);
-
-        putFromLoad(cacheAccess, session);
         assertEquals(3, testing.region().getElementCountInMemory());
 
         getCacheFound(session, cacheAccess);

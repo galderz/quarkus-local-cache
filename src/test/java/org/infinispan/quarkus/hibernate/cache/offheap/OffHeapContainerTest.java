@@ -72,22 +72,22 @@ public class OffHeapContainerTest {
 
     @Test
     public void testSize() {
-        assertEquals(0, container.size());
+        assertEquals(0, container.count());
 
         container.put("140", "v140");
-        assertEquals(1, container.size());
+        assertEquals(1, container.count());
 
         container.invalidate("140");
-        assertEquals(0, container.size());
+        assertEquals(0, container.count());
 
         container.putIfAbsent("141", "v141");
-        assertEquals(1, container.size());
+        assertEquals(1, container.count());
 
         container.putIfAbsent("142", "v142");
-        assertEquals(2, container.size());
+        assertEquals(2, container.count());
 
         container.invalidateAll();
-        assertEquals(0, container.size());
+        assertEquals(0, container.count());
     }
 
     @Test

@@ -29,7 +29,7 @@ final class DomainDataRegionImpl implements DomainDataRegion, ExtendedStatistics
 
     @Override
     public long getElementCountInMemory() {
-        return cache.size();
+        return cache.count();
     }
 
     @Override
