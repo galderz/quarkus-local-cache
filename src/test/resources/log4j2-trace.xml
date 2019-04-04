@@ -2,7 +2,7 @@
 
 <!--
 To use, pass in:
-  -Dlog4j.configurationFile=log4j2-stress.xml
+  -Dlog4j.configurationFile=log4j2-trace.xml
 -->
 <Configuration verbose="false" status="warn" packages="org.infinispan.quarkus.log4j">
 
@@ -14,9 +14,9 @@ To use, pass in:
    </Appenders>
 
    <Loggers>
-       <Logger name="org.hibernate" level="error" />
-       <Logger name="org.infinispan.quarkus" level="error" />
-       <Root level="error">
+       <Logger name="org.hibernate" level="trace" />
+       <Logger name="org.infinispan.quarkus" level="trace" />
+       <Root level="trace">
           <AppenderRef ref="FileAppender"/>
        </Root>
    </Loggers>

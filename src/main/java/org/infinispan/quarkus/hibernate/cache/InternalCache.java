@@ -13,6 +13,7 @@ interface InternalCache {
 
     void put(Object key, Object value);
 
+    // TODO consider returning void since return is not really used
     Object compute(Object key, BiFunction<Object, Object, Object> remappingFunction);
 
     void invalidate(Object key);
