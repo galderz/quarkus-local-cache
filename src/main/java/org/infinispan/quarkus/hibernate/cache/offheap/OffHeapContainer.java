@@ -3,7 +3,6 @@ package org.infinispan.quarkus.hibernate.cache.offheap;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
-import java.util.function.BiFunction;
 import java.util.function.Function;
 
 public final class OffHeapContainer {
@@ -46,51 +45,6 @@ public final class OffHeapContainer {
             memoryAddresses <<= 1;
         }
         return memoryAddresses;
-    }
-
-    // TODO a relatively expensive operation given all the marshall/unmarshall happening
-    // TODO should strive to get remapping functions that can extract info out of the byte[] directly
-    public Object compute(Object key, BiFunction<Object, Object, Object> remappingFunction) {
-        final byte[] keyBytes = marshalling.marshall().apply(key);
-        BiFunction<byte[], byte[], byte[]> remappingFnBytes = (k, prev) -> {
-            final Object keyObj = marshalling.unmarshall().apply(k);
-            final Object prevObj = marshalling.unmarshall().apply(prev);
-            final Object result = remappingFunction.apply(keyObj, prevObj);
-            return marshalling.marshall().apply(result);
-        };
-
-        final byte[] result = compute(keyBytes, remappingFnBytes);
-        return marshalling.unmarshall().apply(result);
-    }
-
-    private byte[] compute(byte[] key, BiFunction<byte[], byte[], byte[]> remappingFunction) {
-        Lock lock = locks.getLock(key).writeLock();
-        lock.lock();
-        try {
-            long bucketAddress = bucketMemory.getBucketAddress(key);
-            long entryAddress = bucketAddress == 0 ? 0 : getEntry(bucketAddress, key);
-
-            byte[] prev;
-            if (entryAddress != 0) {
-                prev = fromMemory(entryAddress);
-            } else {
-                prev = null;
-            }
-
-            byte[] result = remappingFunction.apply(key, prev);
-            if (prev != result) {
-                if (result != null) {
-                    final long resultAddress = toMemory(key, result);
-                    putEntry(bucketAddress, resultAddress, key, entryAddress);
-                } else {
-                    invalidateEntry(bucketAddress, key, entryAddress);
-                }
-            }
-
-            return result;
-        } finally {
-            lock.unlock();
-        }
     }
 
     public Object get(Object key) {

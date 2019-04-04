@@ -1,7 +1,5 @@
 package org.infinispan.quarkus.hibernate.cache;
 
-import java.util.Comparator;
-
 interface InternalRegion {
 
     boolean checkValid();
@@ -10,14 +8,8 @@ interface InternalRegion {
 
     void endInvalidation();
 
-    long getLastRegionInvalidation();
-
     String getName();
 
     void clear();
-
-    Comparator<Object> getComparator(String subclass);
-
-    void addComparator(String name, Comparator<Object> comparator);
 
 }

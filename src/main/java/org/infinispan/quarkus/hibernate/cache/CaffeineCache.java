@@ -7,10 +7,6 @@ import com.github.benmanes.caffeine.cache.Ticker;
 import org.jboss.logging.Logger;
 
 import java.time.Duration;
-import java.util.Map;
-import java.util.function.BiFunction;
-import java.util.function.Consumer;
-import java.util.function.Predicate;
 
 final class CaffeineCache implements InternalCache {
 
@@ -20,7 +16,7 @@ final class CaffeineCache implements InternalCache {
     private static final Ticker TICKER = Ticker.systemTicker();
     static final Time.NanosService TIME_SERVICE = TICKER::read;
 
-    private final Cache cache;
+    private final Cache<Object, Object> cache;
     private final String cacheName;
 
     CaffeineCache(String cacheName, InternalCacheConfig config, Time.NanosService nanosTimeService) {
@@ -28,7 +24,7 @@ final class CaffeineCache implements InternalCache {
         long objectCount = config.objectCount;
 
         this.cacheName = cacheName;
-        final Caffeine cacheBuilder = Caffeine.newBuilder()
+        final Caffeine<Object, Object> cacheBuilder = Caffeine.newBuilder()
                 .ticker(nanosTimeService::nanoTime);
 
         if (!Time.isForever(maxIdle)) {
@@ -71,16 +67,6 @@ final class CaffeineCache implements InternalCache {
     }
 
     @Override
-    public Object compute(Object key, BiFunction<Object, Object, Object> remappingFunction) {
-        final Object result = cache.asMap().compute(key, remappingFunction);
-        if (trace) {
-            log.tracef("Computing function=%s on key=%s returns: %s", remappingFunction, key, result);
-        }
-
-        return result;
-    }
-
-    @Override
     public void invalidate(Object key) {
         if (trace) {
             log.tracef("Cache invalidate key %s", key);
@@ -90,31 +76,17 @@ final class CaffeineCache implements InternalCache {
     }
 
     @Override
-    public long size(Predicate<Map.Entry> filter) {
+    public long size() {
         // Size calculated for stats, so try to get as accurate count as possible
         // by performing any cleanup operations before returning the result
         cache.cleanUp();
 
-        if (filter == null) {
-            final long size = cache.estimatedSize();
-            if (trace) {
-                log.tracef("Cache(%s) size estimated at %d elements", cacheName, size);
-            }
-
-            return size;
-        } else {
-            final long size = cache.asMap().entrySet().stream().filter(filter).count();
-            if (trace) {
-                log.tracef("Cache(%s) size for entries matching filter(%s) is %d elements", cacheName, filter, size);
-            }
-
-            return size;
+        final long size = cache.estimatedSize();
+        if (trace) {
+            log.tracef("Cache(%s) size estimated at %d elements", cacheName, size);
         }
-    }
 
-    @Override
-    public void forEach(Predicate<Map.Entry> filter, Consumer<Map.Entry> action) {
-        cache.asMap().entrySet().stream().filter(filter).forEach(action);
+        return size;
     }
 
     @Override
@@ -135,15 +107,11 @@ final class CaffeineCache implements InternalCache {
         cache.invalidateAll();
     }
 
-    // Unnecessarily checks if values are VersionedEntry if non-strict not used.
-    // However, with caches kept at region level so, impossible to know at cache creation whether non-strict will be used or not.
-    // Alternative would be for cache granularity to be at data access level (needs more analysis).
-    // e.g. regions would then need to aggregate counts for all data accesses for that region.
-    private static final class CacheExpiryPolicy implements Expiry {
+    private static final class CacheExpiryPolicy implements Expiry<Object, Object> {
 
         private final long maxIdleNanos;
 
-        public CacheExpiryPolicy(Duration maxIdle) {
+        CacheExpiryPolicy(Duration maxIdle) {
             if (maxIdle == null)
                 this.maxIdleNanos = -1;
             else
@@ -152,23 +120,10 @@ final class CaffeineCache implements InternalCache {
 
         @Override
         public long expireAfterCreate(Object key, Object value, long currentTime) {
-            return calculateExpiration(value, currentTime);
+            return calculateExpiration();
         }
 
-        private long calculateExpiration(Object value, long currentTime) {
-            if (value instanceof VersionedEntry) {
-                // Deal with versioned entry expirations
-                final VersionedEntry versioned = (VersionedEntry) value;
-                if (maxIdleNanos > 0) {
-                    final long idleDeadline = currentTime + maxIdleNanos;
-                    final long versionedLifespan = versioned.getLifespanNanos();
-                    log.tracef("Expire after create, either idle deadline %d (ns) or versioned entry lifespan %d (ns)", idleDeadline, versionedLifespan);
-                    return Math.min(idleDeadline, versionedLifespan);
-                }
-
-                return versioned.getLifespanNanos();
-            }
-
+        private long calculateExpiration() {
             if (maxIdleNanos > 0)
                 return maxIdleNanos;
 
@@ -177,7 +132,7 @@ final class CaffeineCache implements InternalCache {
 
         @Override
         public long expireAfterUpdate(Object key, Object value, long currentTime, long currentDuration) {
-            return calculateExpiration(value, currentTime);
+            return calculateExpiration();
         }
 
         @Override

@@ -1,24 +1,17 @@
 package org.infinispan.quarkus.hibernate.cache;
 
-import org.hibernate.cache.CacheException;
 import org.hibernate.cache.spi.access.SoftLock;
-import org.hibernate.engine.spi.SharedSessionContractImplementor;
-import org.hibernate.resource.transaction.spi.TransactionCoordinator;
 import org.jboss.logging.Logger;
 
-import javax.transaction.Status;
-import javax.transaction.Synchronization;
+final class InternalDataAccessImpl implements InternalDataAccess {
 
-// TODO temporarily public, for correctness testing checks...
-public final class StrictDataAccess implements InternalDataAccess {
-
-    private static final Logger log = Logger.getLogger(StrictDataAccess.class);
+    private static final Logger log = Logger.getLogger(InternalDataAccessImpl.class);
     private static final boolean trace = log.isTraceEnabled();
 
     private final InternalCache cache;
     private final InternalRegion internalRegion;
 
-    StrictDataAccess(InternalCache cache, InternalRegion internalRegion) {
+    InternalDataAccessImpl(InternalCache cache, InternalRegion internalRegion) {
         this.cache = cache;
         this.internalRegion = internalRegion;
     }
@@ -62,14 +55,14 @@ public final class StrictDataAccess implements InternalDataAccess {
         if (!internalRegion.checkValid()) {
             return false;
         }
-        write(session, key, value);
+        write(key);
         return true;
     }
 
     @Override
     public boolean update(Object session, Object key, Object value, Object currentVersion, Object previousVersion) {
         // We update whether or not the region is valid.
-        write(session, key, value);
+        write(key);
         return true;
     }
 
@@ -78,7 +71,7 @@ public final class StrictDataAccess implements InternalDataAccess {
         // We update whether or not the region is valid. Other nodes
         // may have already restored the region so they need to
         // be informed of the change.
-        write(session, key, null);
+        write(key);
     }
 
     @Override
@@ -107,7 +100,7 @@ public final class StrictDataAccess implements InternalDataAccess {
         return false;
     }
 
-    private void write(Object session, Object key, Object value) {
+    private void write(Object key) {
         cache.invalidate(key);
     }
 

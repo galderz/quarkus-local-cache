@@ -100,7 +100,7 @@ final class QueryResultsRegionImpl implements QueryResultsRegion, ExtendedStatis
 
     @Override
     public long getElementCountInMemory() {
-        return cache.size(null);
+        return cache.size();
     }
 
     @Override
