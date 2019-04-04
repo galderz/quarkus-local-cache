@@ -17,7 +17,7 @@ final class OffHeapCache implements InternalCache {
 
     @Override
     public void putIfAbsent(Object key, Object value) {
-        // TODO: Customise this generated block
+        container.put(key, value);
     }
 
     @Override
@@ -27,22 +27,22 @@ final class OffHeapCache implements InternalCache {
 
     @Override
     public void invalidate(Object key) {
-        // TODO: Customise this generated block
+        container.invalidate(key);
     }
 
     @Override
     public long size() {
-        return 0;  // TODO: Customise this generated block
+        return container.size();
     }
 
     @Override
     public void stop() {
-        // TODO: Customise this generated block
+        container.stop();
     }
 
     @Override
     public void invalidateAll() {
-        // TODO: Customise this generated block
+        container.invalidateAll();
     }
 
 }

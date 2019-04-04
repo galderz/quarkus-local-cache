@@ -26,8 +26,25 @@ final class Memory {
     private Memory() {
     }
 
+    void deallocate(long memoryAddress, long size) {
+        long estimatedSize = estimateSizeOverhead(size);
+        ALLOCATED.add(-estimatedSize);
+        if (trace) {
+            log.tracef("Deallocating off heap memory at 0x%016x with %d bytes. Total size: %d",
+                    memoryAddress, estimatedSize, ALLOCATED.sum());
+        }
+
+        Long prev = ALLOCATED_BLOCKS.remove(memoryAddress);
+        if (trace) {
+            if (prev == null) {
+                throw new IllegalArgumentException();
+            }
+        }
+        UNSAFE.freeMemory(memoryAddress);
+    }
+
     long allocate(long size) {
-        long estimatedMemoryLength = estimateSizeOverhead(size);
+        long estimatedSize = estimateSizeOverhead(size);
 
         long address = UNSAFE.allocateMemory(size);
         if (trace) {
@@ -37,10 +54,10 @@ final class Memory {
             }
         }
 
-        ALLOCATED.add(estimatedMemoryLength);
+        ALLOCATED.add(estimatedSize);
         if (trace) {
             log.tracef("Allocated off heap memory at 0x%016x with %d bytes. Total size: %d",
-                    size, estimatedMemoryLength, ALLOCATED.sum());
+                    size, estimatedSize, ALLOCATED.sum());
         }
 
         return address;
@@ -138,6 +155,10 @@ final class Memory {
             throw new IllegalArgumentException(String.format("Trying to access address 0x%016x+%d, but blockSize was %d",
                     address, offset, blockSize));
         }
+    }
+
+    long zero(long offset) {
+        return UNSAFE.getAndSetLong(null, offset, 0);
     }
 
     private static class UnsafeHolder {

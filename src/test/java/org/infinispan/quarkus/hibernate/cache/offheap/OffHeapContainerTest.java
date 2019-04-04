@@ -20,18 +20,16 @@ public class OffHeapContainerTest {
     }
 
     @Test
-    public void testNotFound() {
-        assertNull(container.get("0"));
-    }
-
-    @Test
-    public void testPut() {
+    public void testInvalidate() {
         String key = "100";
         String putValue = "v100";
         container.put(key, putValue);
 
         Object getValue = container.get(key);
         assertEquals(putValue, getValue);
+
+        container.invalidate(key);
+        assertNull(container.get(key));
     }
 
     @Test
@@ -58,6 +56,53 @@ public class OffHeapContainerTest {
 
         assertEquals(v1, container.get(k1));
         assertEquals(v2, container.get(k2));
+    }
+
+    @Test
+    public void testPutIfAbsent() {
+        String key = "130";
+        String v1 = "v" + key;
+
+        container.putIfAbsent(key, v1);
+        assertEquals(v1, container.get(key));
+
+        container.putIfAbsent(key, "v131");
+        assertEquals(v1, container.get(key));
+    }
+
+    @Test
+    public void testSize() {
+        assertEquals(0, container.size());
+
+        container.put("140", "v140");
+        assertEquals(1, container.size());
+
+        container.invalidate("140");
+        assertEquals(0, container.size());
+
+        container.putIfAbsent("141", "v141");
+        assertEquals(1, container.size());
+
+        container.putIfAbsent("142", "v142");
+        assertEquals(2, container.size());
+
+        container.invalidateAll();
+        assertEquals(0, container.size());
+    }
+
+    @Test
+    public void testInvalidateAll() {
+        String k1 = "150", k2 = "151";
+        String v1 = "v" + k1, v2 = "v" + k2;
+
+        container.put(k1, "v" + k1);
+        container.put(k2, "v" + k2);
+        assertEquals(v1, container.get(k1));
+        assertEquals(v2, container.get(k2));
+
+        container.invalidateAll();
+        assertNull(container.get(k1));
+        assertNull(container.get(k2));
     }
 
     private static String forBucket(String s, OffHeapContainer container) {

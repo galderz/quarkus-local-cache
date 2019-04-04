@@ -10,6 +10,7 @@ interface InternalCache {
 
     void invalidate(Object key);
 
+    // TODO rename to mean count elements because the meaning can be misleading for offheap impls
     long size();
 
     void stop();

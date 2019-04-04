@@ -24,6 +24,10 @@ public final class OffHeapContainer {
     private final int memoryAddressCount;
     private final Marshalling marshalling;
 
+    // Variable to make sure memory locations aren't read after being deallocated
+    // This variable should always be read first after acquiring either the read or write lock
+    private boolean dellocated = false;
+
     final BucketMemory bucketMemory;
 
     public OffHeapContainer(int desiredSize) {
@@ -47,6 +51,63 @@ public final class OffHeapContainer {
         return memoryAddresses;
     }
 
+    public void stop() {
+        locks.lockAll();
+        try {
+            invalidateAll();
+            bucketMemory.deallocate();
+            dellocated = true;
+        } finally {
+            locks.unlockAll();
+        }
+    }
+
+    public void invalidateAll() {
+        locks.lockAll();
+        try {
+            checkDeallocation();
+            deallocateAll();
+            size.set(0);
+        } finally {
+            locks.unlockAll();
+        }
+    }
+
+    private void checkDeallocation() {
+        if (dellocated) {
+            throw new IllegalStateException("Map was already shut down!");
+        }
+    }
+
+    private void deallocateAll() {
+        bucketMemory.deallocateBuckets(OffHeapContainer::deallocate);
+    }
+
+    public void putIfAbsent(Object key, Object value) {
+        final byte[] keyBytes = marshalling.marshall().apply(key);
+        final byte[] valueBytes = marshalling.marshall().apply(value);
+        putIfAbsentBytes(keyBytes, valueBytes);
+
+        // TODO ensure size
+    }
+
+    private void putIfAbsentBytes(byte[] key, byte[] value) {
+        Lock lock = locks.getLock(key).writeLock();
+        lock.lock();
+        try {
+            checkDeallocation();
+            long bucketAddress = bucketMemory.getBucketAddress(key);
+            long entryAddress = bucketAddress == 0 ? 0 : getEntry(bucketAddress, key);
+
+            if (entryAddress == 0) {
+                final long resultAddress = toMemory(key, value);
+                putEntry(bucketAddress, resultAddress, key, entryAddress);
+            }
+        } finally {
+            lock.unlock();
+        }
+    }
+
     public Object get(Object key) {
         return marshalling.marshall()
                 .andThen(GET_BYTES)
@@ -58,6 +119,7 @@ public final class OffHeapContainer {
         Lock lock = locks.getLock(key).readLock();
         lock.lock();
         try {
+            checkDeallocation();
             long bucketAddress = bucketMemory.getBucketAddress(key);
             if (bucketAddress == 0) {
                 return null;
@@ -98,6 +160,7 @@ public final class OffHeapContainer {
         Lock lock = locks.getLock(key).writeLock();
         lock.lock();
         try {
+            checkDeallocation();
             long entryAddress = toMemory(key, value);
             long bucketAddress = bucketMemory.getBucketAddress(key);
             putEntry(bucketAddress, entryAddress, key, 0);
@@ -122,6 +185,7 @@ public final class OffHeapContainer {
                 long nextAddress = getNextAddress(address);
                 if (equalsKey(address, key, currentAddress)) {
                     foundPrevious = true;
+                    deallocate(address);
                     // If this is true it means this was the first node in the linked list
                     if (prevAddress == 0) {
                         if (nextAddress == 0) {
@@ -158,10 +222,20 @@ public final class OffHeapContainer {
         }
     }
 
-    private void invalidate(byte[] key) {
+    public long size() {
+        return size.get();
+    }
+
+    public void invalidate(Object key) {
+        byte[] keyBytes = marshalling.marshall().apply(key);
+        invalidateBytes(keyBytes);
+    }
+
+    private void invalidateBytes(byte[] key) {
         Lock lock = locks.getLock(key).writeLock();
         lock.lock();
         try {
+            checkDeallocation();
             long bucketAddress = bucketMemory.getBucketAddress(key);
             if (bucketAddress != 0) {
                 invalidateEntry(bucketAddress, key, 0);
@@ -179,11 +253,14 @@ public final class OffHeapContainer {
             long nextAddress = getNextAddress(address);
             boolean remove = equalsKey(address, key, currentAddress);
             if (remove) {
+                deallocate(address);
                 if (prevAddress != 0) {
                     setNextAddress(prevAddress, nextAddress);
                 } else {
                     bucketMemory.putBucketAddress(key, nextAddress);
                 }
+                size.decrementAndGet();
+                break;
             }
             prevAddress = address;
             address = nextAddress;
@@ -225,11 +302,11 @@ public final class OffHeapContainer {
         return true;
     }
 
-    private void setNextAddress(long address, long value) {
+    private static void setNextAddress(long address, long value) {
         MEMORY.putLong(address, 0, value);
     }
 
-    private long getNextAddress(long address) {
+    private static long getNextAddress(long address) {
         return MEMORY.getLong(address, 0);
     }
 
@@ -239,13 +316,13 @@ public final class OffHeapContainer {
      * The first 8 bytes will always be 0,
      * reserved for a future reference to another entry.
      */
-    private long toMemory(byte[] key, byte[] value) {
+    private static long toMemory(byte[] key, byte[] value) {
         int keySize = key.length;
         int valueSize = value.length;
 
         // Next 8 is for linked pointer to next address
-        long totalSize = 8 + HEADER_LENGTH + + keySize + valueSize;
-        long memoryAddress = MEMORY.allocate(totalSize);
+        long totalSize = 8 + HEADER_LENGTH + keySize + valueSize;
+        long memoryAddress = allocate(totalSize);
 
         int offset = 0;
 
@@ -273,7 +350,15 @@ public final class OffHeapContainer {
         return memoryAddress;
     }
 
-    private byte[] fromMemory(long address) {
+    private static long allocate(long totalSize) {
+        return MEMORY.allocate(totalSize);
+    }
+
+    private static void deallocate(long address) {
+        MEMORY.deallocate(address, memorySize(address));
+    }
+
+    private static byte[] fromMemory(long address) {
         int offset = 8;
 
         byte metadataType = MEMORY.getByte(address, offset);
@@ -294,7 +379,24 @@ public final class OffHeapContainer {
         return valueBytes;
     }
 
-    private int bytesHashCode(byte[] bytes) {
+    private static long memorySize(long address) {
+        int offset = 8;
+
+        // Skip metadata type
+        offset += 1;
+        // Skip the hashCode
+        offset += 4;
+        int keyLength = MEMORY.getInt(address, offset);
+        offset += 4;
+
+        int valueLength = MEMORY.getInt(address, offset);
+        offset += 4;
+
+        return offset + keyLength + valueLength;
+    }
+
+    private static int bytesHashCode(byte[] bytes) {
         return Arrays.hashCode(bytes);
     }
+
 }

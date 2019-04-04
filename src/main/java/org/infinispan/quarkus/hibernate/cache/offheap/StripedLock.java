@@ -19,6 +19,18 @@ final class StripedLock {
         return getLockFromHashCode(Arrays.hashCode(obj));
     }
 
+    void lockAll() {
+        for (ReadWriteLock rwLock : locks) {
+            rwLock.writeLock().lock();
+        }
+    }
+
+    void unlockAll() {
+        for (ReadWriteLock rwLock : locks) {
+            rwLock.writeLock().unlock();
+        }
+    }
+
     private ReadWriteLock getLockFromHashCode(int hashCode) {
         int offset = Math.calculateOffset(hashCode);
         return locks[offset];
