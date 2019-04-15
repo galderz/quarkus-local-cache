@@ -51,7 +51,7 @@ public class OffHeapMaxSizeTest {
         assertEquals(0, container.count());
 
         IntStream.range(0, itemCount)
-                .forEach(i -> container.put("11" + i, "v11" + i));
+                .forEach(i -> container.putIfAbsent("11" + i, "v11" + i));
 
         assertEquals(itemCount - 1, container.count());
         assertNull(container.get("110"));

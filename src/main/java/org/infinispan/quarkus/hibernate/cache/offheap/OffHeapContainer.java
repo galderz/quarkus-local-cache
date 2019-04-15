@@ -122,11 +122,14 @@ public final class OffHeapContainer {
     }
 
     public void putIfAbsent(Object key, Object value) {
+        if (trace) {
+            log.tracef("Cache put if absent key=%s value=%s", key, value);
+        }
+
         final byte[] keyBytes = marshalling.marshall().apply(key);
         final byte[] valueBytes = marshalling.marshall().apply(value);
         putIfAbsentBytes(keyBytes, valueBytes);
-
-        // TODO ensure size
+        ensureSize();
     }
 
     private void putIfAbsentBytes(byte[] key, byte[] value) {
@@ -198,13 +201,12 @@ public final class OffHeapContainer {
     }
 
     public void put(Object key, Object value) {
-        final byte[] keyBytes = marshalling.marshall().apply(key);
-        final byte[] valueBytes = marshalling.marshall().apply(value);
-
         if (trace) {
             log.tracef("Cache put key=%s value=%s", key, value);
         }
 
+        final byte[] keyBytes = marshalling.marshall().apply(key);
+        final byte[] valueBytes = marshalling.marshall().apply(value);
         putBytes(keyBytes, valueBytes);
         ensureSize();
     }
