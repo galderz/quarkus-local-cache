@@ -11,7 +11,7 @@ import java.util.Map;
 import static org.infinispan.quarkus.hibernate.cache.Eventually.eventually;
 import static org.junit.Assert.assertEquals;
 
-public class CacheRegionMaxSizeTest {
+public class CacheRegionMaxCountTest {
 
     @Test
     public void testMaxSize() {

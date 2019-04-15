@@ -31,7 +31,7 @@ final class StripedLock {
         }
     }
 
-    private ReadWriteLock getLockFromHashCode(int hashCode) {
+    ReadWriteLock getLockFromHashCode(int hashCode) {
         int offset = Math.calculateOffset(hashCode);
         return locks[offset];
     }

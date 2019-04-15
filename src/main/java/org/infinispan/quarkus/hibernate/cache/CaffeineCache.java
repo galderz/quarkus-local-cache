@@ -21,7 +21,7 @@ final class CaffeineCache implements InternalCache {
 
     CaffeineCache(String cacheName, InternalCacheConfig config, Time.NanosService nanosTimeService) {
         Duration maxIdle = config.maxIdle;
-        long objectCount = config.objectCount;
+        long objectCount = config.maxObjectCount;
 
         this.cacheName = cacheName;
         final Caffeine<Object, Object> cacheBuilder = Caffeine.newBuilder()

@@ -3,7 +3,6 @@ package org.infinispan.quarkus.hibernate.cache.offheap;
 import java.util.Arrays;
 import java.util.function.LongConsumer;
 import java.util.stream.LongStream;
-import java.util.stream.Stream;
 
 final class BucketMemory {
 
@@ -11,10 +10,11 @@ final class BucketMemory {
 
     private final long memory;
     private final int pointerCount;
+    private final long bytes;
 
     BucketMemory(int pointers) {
         this.pointerCount = Math.findNextHighestPowerOfTwo(pointers);
-        long bytes = ((long) pointerCount) << 3;
+        bytes = ((long) pointerCount) << 3;
         memory = MEMORY.allocate(bytes);
         MEMORY.setMemory(memory, bytes, (byte) 0);
     }
@@ -44,6 +44,10 @@ final class BucketMemory {
 
     void deallocate() {
         MEMORY.deallocate(memory, pointerCount << 3);
+    }
+
+    long usedMemory() {
+        return MEMORY.estimateSizeOverhead(bytes);
     }
 
 }

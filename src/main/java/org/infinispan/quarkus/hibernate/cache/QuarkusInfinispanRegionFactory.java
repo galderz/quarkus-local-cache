@@ -215,7 +215,7 @@ public final class QuarkusInfinispanRegionFactory implements RegionFactory {
                         }
 
                         if (key.contains(OBJECT_COUNT_SUFFIX)) {
-                            cacheConfig.objectCount = Long.parseLong(value);
+                            cacheConfig.maxObjectCount = Long.parseLong(value);
                         } else if (key.contains(MAX_IDLE_SUFFIX)) {
                             cacheConfig.maxIdle = Duration.ofSeconds(Long.parseLong(value));
                         }
@@ -233,7 +233,7 @@ public final class QuarkusInfinispanRegionFactory implements RegionFactory {
         // That is, sensible defaults to avoid running out of memory.
         InternalCacheConfig cacheConfig = new InternalCacheConfig();
         cacheConfig.maxIdle = Duration.ofSeconds(100);
-        cacheConfig.objectCount = 10_000;
+        cacheConfig.maxObjectCount = 10_000;
         return cacheConfig;
     }
 
@@ -242,7 +242,7 @@ public final class QuarkusInfinispanRegionFactory implements RegionFactory {
         // They're required to verify whether a query can be served from cache.
         InternalCacheConfig cacheConfig = new InternalCacheConfig();
         cacheConfig.maxIdle = Time.forever();
-        cacheConfig.objectCount = -1;
+        cacheConfig.maxObjectCount = -1;
         return cacheConfig;
     }
 
@@ -250,13 +250,13 @@ public final class QuarkusInfinispanRegionFactory implements RegionFactory {
         // Sensible defaults to avoid running out of memory
         InternalCacheConfig cacheConfig = new InternalCacheConfig();
         cacheConfig.maxIdle = Duration.ofSeconds(100);
-        cacheConfig.objectCount = 10_000;
+        cacheConfig.maxObjectCount = 10_000;
         return cacheConfig;
     }
 
     public Optional<Long> getMemoryObjectCount(String region) {
         InternalCacheConfig config = cacheConfigs.get(region);
-        return config == null ? Optional.empty() : Optional.of(config.objectCount);
+        return config == null ? Optional.empty() : Optional.of(config.maxObjectCount);
     }
 
     public Optional<Duration> getExpirationMaxIdle(String region) {

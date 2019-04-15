@@ -141,7 +141,7 @@ final class Memory {
         UNSAFE.copyMemory(null, srcAddress + srcOffset, destArray, BYTE_ARRAY_BASE_OFFSET + destOffset, length);
     }
 
-    private static long estimateSizeOverhead(long size) {
+    long estimateSizeOverhead(long size) {
         // We take 8 and add the number provided and then round up to 16 (& operator has higher precedence than +)
         return (size + 8 + 15) & ~15;
     }

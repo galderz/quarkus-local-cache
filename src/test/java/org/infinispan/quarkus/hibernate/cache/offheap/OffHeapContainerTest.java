@@ -1,5 +1,6 @@
 package org.infinispan.quarkus.hibernate.cache.offheap;
 
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -16,7 +17,14 @@ public class OffHeapContainerTest {
 
     @Before
     public void createContainer() {
-        container = new OffHeapContainer(1024, MARSHALL);
+        // Max size is at least number of bucket pointers, plus a little bit more
+        int maxSize = (1 << 20) * 8 + 1024;
+        container = new OffHeapContainer(maxSize, MARSHALL);
+    }
+
+    @After
+    public void destroyContainer() {
+        container.stop();
     }
 
     @Test

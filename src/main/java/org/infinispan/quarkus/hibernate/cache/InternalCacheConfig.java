@@ -4,7 +4,8 @@ import java.time.Duration;
 
 final class InternalCacheConfig {
 
-    long objectCount;
+    long maxObjectCount;
+    long maxMemorySize;
     Duration maxIdle;
 
 }
