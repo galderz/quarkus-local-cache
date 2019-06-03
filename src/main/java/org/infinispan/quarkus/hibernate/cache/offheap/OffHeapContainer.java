@@ -1,7 +1,9 @@
 package org.infinispan.quarkus.hibernate.cache.offheap;
 
+import org.infinispan.quarkus.hibernate.cache.Time;
 import org.jboss.logging.Logger;
 
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
@@ -10,7 +12,7 @@ import java.util.function.Function;
 
 public final class OffHeapContainer {
 
-    private static final Logger log = Logger.getLogger(Memory.class);
+    private static final Logger log = Logger.getLogger(OffHeapContainer.class);
     private static final boolean trace = log.isTraceEnabled();
 
     // Max would be 1:1 ratio with memory addresses - must be a crazy machine to have that many processors
@@ -34,6 +36,9 @@ public final class OffHeapContainer {
 
     private final Lock lruLock = new ReentrantLock();
     private final long maxSize;
+    private final Time.NanosService time;
+    private final boolean isTransient;
+    private final long maxIdleNanos;
 
     // TODO is this required? isn't this already tracked by bucket + data memory sizes?
     private long currentSize;
@@ -47,11 +52,11 @@ public final class OffHeapContainer {
 
     final BucketMemory bucketMemory;
 
-    public OffHeapContainer(long maxSize) {
-        this(maxSize, Marshalling.JAVA);
+    public OffHeapContainer(long maxSize, Time.NanosService time, Duration maxIdle) {
+        this(maxSize, Marshalling.JAVA, time, maxIdle);
     }
 
-    OffHeapContainer(long maxSize, Marshalling marshalling) {
+    OffHeapContainer(long maxSize, Marshalling marshalling, Time.NanosService time, Duration maxIdle) {
         this.maxSize = maxSize;
         this.locks = new StripedLock();
 
@@ -59,6 +64,10 @@ public final class OffHeapContainer {
         this.bucketMemory = createBucketMemory(bucketAddressCount);
 
         this.marshalling = marshalling;
+        this.time = time;
+
+        this.isTransient = !Time.isForever(maxIdle);
+        this.maxIdleNanos = isTransient ? maxIdle.toNanos() : -1;
     }
 
     private BucketMemory createBucketMemory(int bucketAddressCount) {
@@ -118,7 +127,7 @@ public final class OffHeapContainer {
     }
 
     private void deallocateAll() {
-        bucketMemory.deallocateBuckets(OffHeapContainer::deallocate);
+        bucketMemory.deallocateBuckets(this::deallocate);
     }
 
     public void putIfAbsent(Object key, Object value) {
@@ -434,6 +443,27 @@ public final class OffHeapContainer {
     }
 
     public long count() {
+        if (isTransient) {
+            long size = 0;
+            long current = firstAddress;
+            while (current != 0) {
+                final long nextAddress = LruNode.getNext(current);
+                final long lastUsed = getLastUsed(current);
+
+                if (isExpired(lastUsed)) {
+                    final byte[] keyBytes = getKeyAt(current);
+                    invalidateBytesAt(keyBytes, current);
+                } else {
+                    size++;
+                }
+
+                current = nextAddress;
+            }
+
+            return size;
+        }
+
+
         return count.get();
     }
 
@@ -504,6 +534,11 @@ public final class OffHeapContainer {
             return false;
         }
         headerOffset += 4;
+
+        // Skip last used time if transient
+        if (isTransient)
+            headerOffset += 8;
+
         // If the length of the key is not the same it can't match either!
         int keyLength = MEMORY.getInt(address, headerOffset);
         if (keyLength != key.length) {
@@ -512,6 +547,7 @@ public final class OffHeapContainer {
         headerOffset += 4;
         // This is for the value size which we don't need to read
         headerOffset += 4;
+
         // Finally read each byte individually so we don't have to copy them into a byte[]
         for (int i = 0; i < keyLength; i++) {
             byte b = MEMORY.getByte(address, headerOffset + i);
@@ -543,7 +579,7 @@ public final class OffHeapContainer {
         // Eviction requires 2 additional pointers at the beginning
         int offset = 16;
         // Next 8 is for linked pointer to next address
-        long totalSize = offset + 8 + HEADER_LENGTH + keySize + valueSize;
+        long totalSize = offset + 8 + HEADER_LENGTH + (isTransient ? 8 : 0) + keySize + valueSize;
         long memoryAddress = allocate(totalSize);
 
         // Write the empty linked address pointer first
@@ -555,6 +591,12 @@ public final class OffHeapContainer {
 
         MEMORY.putInt(memoryAddress, offset, bytesHashCode(key));
         offset += 4;
+
+        if (isTransient) {
+            MEMORY.putLong(memoryAddress, offset, time.nanoTime());
+            offset += 8;
+        }
+
         MEMORY.putInt(memoryAddress, offset, key.length);
         offset += 4;
         MEMORY.putInt(memoryAddress, offset, value.length);
@@ -574,11 +616,11 @@ public final class OffHeapContainer {
         return MEMORY.allocate(totalSize);
     }
 
-    private static void deallocate(long address) {
+    private void deallocate(long address) {
         MEMORY.deallocate(address, memorySize(address));
     }
 
-    private static byte[] fromMemory(long address) {
+    private byte[] fromMemory(final long address) {
         // Eviction pointers (16)
         // Next pointer (8)
         int offset = 24;
@@ -587,6 +629,14 @@ public final class OffHeapContainer {
         offset += 1;
         int hashCode = MEMORY.getInt(address, offset);
         offset += 4;
+
+        boolean isExpired = false;
+        if (isTransient) {
+            long lastUsed = MEMORY.getLong(address, offset);
+            isExpired = isExpired(lastUsed);
+            offset += 8;
+        }
+
         byte[] keyBytes = new byte[MEMORY.getInt(address, offset)];
         offset += 4;
 
@@ -595,13 +645,24 @@ public final class OffHeapContainer {
 
         MEMORY.getBytes(address, offset, keyBytes, 0, keyBytes.length);
         offset += keyBytes.length;
+
+        if (isExpired) {
+            invalidateBytesAt(keyBytes, address);
+            return null;
+        }
+
         MEMORY.getBytes(address, offset, valueBytes, 0, valueBytes.length);
         // offset += valueBytes.length;
 
         return valueBytes;
     }
 
-    private static long memorySize(long address) {
+    private boolean isExpired(long lastUsed) {
+        final long now = time.nanoTime();
+        return now > lastUsed + maxIdleNanos;
+    }
+
+    private long memorySize(long address) {
         // Eviction pointers (16)
         // Next pointer (8)
         int offset = 24;
@@ -616,6 +677,10 @@ public final class OffHeapContainer {
         int valueLength = MEMORY.getInt(address, offset);
         offset += 4;
 
+        // Last used time, if transient
+        if (isTransient)
+            offset += 8;
+
         return offset + keyLength + valueLength;
     }
 
@@ -627,12 +692,10 @@ public final class OffHeapContainer {
     private byte[] getKeyAt(long address) {
         // 16 bytes for eviction
         // 8 bytes for linked pointer
-        int offset = 24;
+        // 1 for metadata type
+        // 4 for hash code
+        int offset = isTransient ? 37 : 29;
 
-        byte metadataType = MEMORY.getByte(address, offset);
-        offset += 1;
-        // Ignore hashCode bytes
-        offset += 4;
         byte[] keyBytes = new byte[MEMORY.getInt(address, offset)];
         offset += 4;
 
@@ -644,12 +707,21 @@ public final class OffHeapContainer {
         return keyBytes;
     }
 
-    private int getHashCodeAt(long entryAddress) {
+    private int getHashCodeAt(long address) {
         // 16 bytes for eviction
         // 8 bytes for linked pointer
         // 1 for type
-        int headerOffset = 25;
-        return MEMORY.getInt(entryAddress, headerOffset);
+        int offset = 25;
+        return MEMORY.getInt(address, offset);
+    }
+
+    private long getLastUsed(long address) {
+        // 16 bytes for eviction
+        // 8 bytes for linked pointer
+        // 1 for metadata type
+        // 4 for hash code
+        int offset = 29;
+        return MEMORY.getLong(address, offset);
     }
 
     /**

@@ -3,19 +3,19 @@ package org.infinispan.quarkus.hibernate.cache;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 
-final class Time {
+public final class Time {
 
     private static final Duration FOREVER = ChronoUnit.FOREVER.getDuration();
 
     private Time() {
     }
 
-    static Duration forever() {
+    public static Duration forever() {
         return FOREVER;
     }
 
-    static boolean isForever(Duration duration) {
-        return FOREVER.equals(duration);
+    public static boolean isForever(Duration duration) {
+        return FOREVER == duration;
     }
 
     @FunctionalInterface

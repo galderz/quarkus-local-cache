@@ -1,5 +1,6 @@
 package org.infinispan.quarkus.hibernate.cache.offheap;
 
+import org.infinispan.quarkus.hibernate.cache.Time;
 import org.junit.Test;
 
 import java.util.Collections;
@@ -17,7 +18,7 @@ public class OffHeapMaxSizeTest {
         // Enough size to put 3 entries, each rounded up to 64
         int maxSize = (1 << 20) * 8 + 208;
         int itemCount = 3;
-        OffHeapContainer container = new OffHeapContainer(maxSize, MARSHALL);
+        OffHeapContainer container = new OffHeapContainer(maxSize, MARSHALL, null, Time.forever());
         assertEquals(0, container.count());
 
         IntStream.range(0, itemCount)
@@ -47,7 +48,7 @@ public class OffHeapMaxSizeTest {
         int maxSize = (1 << 20) * 8 + 207;
 
         int itemCount = 3;
-        OffHeapContainer container = new OffHeapContainer(maxSize, MARSHALL);
+        OffHeapContainer container = new OffHeapContainer(maxSize, MARSHALL, null, Time.forever());
         assertEquals(0, container.count());
 
         IntStream.range(0, itemCount)
@@ -64,7 +65,7 @@ public class OffHeapMaxSizeTest {
         // Enough size to put 3 entries, each rounded up to 64
         int maxSize = (1 << 20) * 8 + 208;
         int itemCount = 3;
-        OffHeapContainer container = new OffHeapContainer(maxSize, MARSHALL);
+        OffHeapContainer container = new OffHeapContainer(maxSize, MARSHALL, null, Time.forever());
         assertEquals(0, container.count());
 
         IntStream.range(0, itemCount)

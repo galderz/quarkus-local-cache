@@ -7,7 +7,7 @@ final class OffHeapCache implements InternalCache {
     final OffHeapContainer container;
 
     OffHeapCache(int desiredSize) {
-        container = new OffHeapContainer(desiredSize);
+        container = new OffHeapContainer(desiredSize, null, Time.forever());
     }
 
     @Override

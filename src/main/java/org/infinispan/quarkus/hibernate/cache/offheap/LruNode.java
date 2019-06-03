@@ -3,7 +3,7 @@ package org.infinispan.quarkus.hibernate.cache.offheap;
 /**
  *  Accessors for the fields of a native LRU list node.
  */
-public class LruNode {
+final class LruNode {
 
     private static final Memory MEMORY = Memory.INSTANCE;
 
