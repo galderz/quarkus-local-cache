@@ -10,7 +10,7 @@ final class BucketMemory {
 
     private final long memory;
     private final int pointerCount;
-    private final long bytes;
+    final long bytes;
 
     BucketMemory(int pointers) {
         this.pointerCount = Math.findNextHighestPowerOfTwo(pointers);

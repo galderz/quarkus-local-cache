@@ -16,7 +16,7 @@ public class OffHeapMaxSizeTest {
     @Test
     public void testEvictWhenMaxSizeReached() {
         // Enough size to put 3 entries, each rounded up to 64
-        int maxSize = (1 << 20) * 8 + 208;
+        int maxSize = 208;
         int itemCount = 3;
         OffHeapContainer container = new OffHeapContainer(maxSize, MARSHALL, null, Time.forever());
         assertEquals(0, container.count());
@@ -45,7 +45,7 @@ public class OffHeapMaxSizeTest {
     @Test
     public void testEvictWhenMaxSizeExceeded() {
         // Only enough to put 2 entries, 3 * 64 = 208
-        int maxSize = (1 << 20) * 8 + 207;
+        int maxSize = 207;
 
         int itemCount = 3;
         OffHeapContainer container = new OffHeapContainer(maxSize, MARSHALL, null, Time.forever());
@@ -63,7 +63,7 @@ public class OffHeapMaxSizeTest {
     @Test
     public void testEvictLeastRecentlyRead() {
         // Enough size to put 3 entries, each rounded up to 64
-        int maxSize = (1 << 20) * 8 + 208;
+        int maxSize = 208;
         int itemCount = 3;
         OffHeapContainer container = new OffHeapContainer(maxSize, MARSHALL, null, Time.forever());
         assertEquals(0, container.count());

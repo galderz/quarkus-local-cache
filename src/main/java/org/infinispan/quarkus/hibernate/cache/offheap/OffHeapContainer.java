@@ -57,11 +57,11 @@ public final class OffHeapContainer {
     }
 
     OffHeapContainer(long maxSize, Marshalling marshalling, Time.NanosService time, Duration maxIdle) {
-        this.maxSize = maxSize;
         this.locks = new StripedLock();
 
         int bucketAddressCount = getActualAddressCount(ADDRESS_COUNT);
         this.bucketMemory = createBucketMemory(bucketAddressCount);
+        this.maxSize = maxSize + this.bucketMemory.bytes;
 
         this.marshalling = marshalling;
         this.time = time;
