@@ -150,6 +150,7 @@ final class Memory {
         if (!trace)
             return;
 
+        log.tracef("Check address 0x%016x+%d", address, offset);
         Long blockSize = ALLOCATED_BLOCKS.get(address);
         if (blockSize == null || blockSize < offset) {
             throw new IllegalArgumentException(String.format("Trying to access address 0x%016x+%d, but blockSize was %d",

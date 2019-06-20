@@ -143,7 +143,7 @@ public final class QuarkusInfinispanRegionFactory implements RegionFactory {
             if (cache == null) {
                 final InternalCacheConfig userDefinedCacheConfig = cacheConfigs.get(cacheName);
                 final InternalCacheConfig cacheConfig = userDefinedCacheConfig == null ? defaultDomainCacheConfig() : userDefinedCacheConfig;
-                cache = new CaffeineCache(cacheName, cacheConfig, this.cacheTimeService);
+                cache = new OffHeapCache(cacheConfig, this.cacheTimeService);
             }
 
             return cache;
@@ -234,6 +234,7 @@ public final class QuarkusInfinispanRegionFactory implements RegionFactory {
         InternalCacheConfig cacheConfig = new InternalCacheConfig();
         cacheConfig.maxIdle = Duration.ofSeconds(100);
         cacheConfig.maxObjectCount = 10_000;
+        cacheConfig.maxMemorySize = ((1 << 20) * 8) + (1 << 20);
         return cacheConfig;
     }
 
@@ -243,6 +244,7 @@ public final class QuarkusInfinispanRegionFactory implements RegionFactory {
         InternalCacheConfig cacheConfig = new InternalCacheConfig();
         cacheConfig.maxIdle = Time.forever();
         cacheConfig.maxObjectCount = -1;
+        cacheConfig.maxMemorySize = ((1 << 20) * 8) + (1 << 20);
         return cacheConfig;
     }
 
@@ -251,6 +253,7 @@ public final class QuarkusInfinispanRegionFactory implements RegionFactory {
         InternalCacheConfig cacheConfig = new InternalCacheConfig();
         cacheConfig.maxIdle = Duration.ofSeconds(100);
         cacheConfig.maxObjectCount = 10_000;
+        cacheConfig.maxMemorySize = ((1 << 20) * 8) + (1 << 20);
         return cacheConfig;
     }
 

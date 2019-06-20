@@ -56,4 +56,25 @@ public class OffHeapMaxIdleTest {
         assertEquals(0, container.count());
     }
 
+    @Test
+    public void testInvalidateAll() {
+        assertEquals(0, container.count());
+        container.putIfAbsent("120", "v120");
+        assertEquals(1, container.count());
+        container.invalidateAll();
+        assertEquals(0, container.count());
+        container.putIfAbsent("121", "v121");
+        assertEquals(1, container.count());
+    }
+
+    @Test
+    public void testInvalidate() {
+        assertEquals(0, container.count());
+        final String key = "130";
+        container.putIfAbsent(key, "v130");
+        assertEquals(1, container.count());
+        container.invalidate(key);
+        assertEquals(0, container.count());
+    }
+
 }

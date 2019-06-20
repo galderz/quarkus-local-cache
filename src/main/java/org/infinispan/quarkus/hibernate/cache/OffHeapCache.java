@@ -2,12 +2,17 @@ package org.infinispan.quarkus.hibernate.cache;
 
 import org.infinispan.quarkus.hibernate.cache.offheap.OffHeapContainer;
 
+import java.time.Duration;
+
 final class OffHeapCache implements InternalCache {
 
     final OffHeapContainer container;
 
-    OffHeapCache(int desiredSize) {
-        container = new OffHeapContainer(desiredSize, null, Time.forever());
+    OffHeapCache(InternalCacheConfig config, Time.NanosService nanosTimeService) {
+        Duration maxIdle = config.maxIdle;
+        long memorySize = config.maxMemorySize;
+
+        container = new OffHeapContainer(memorySize, nanosTimeService, maxIdle);
     }
 
     @Override

@@ -115,6 +115,8 @@ public final class OffHeapContainer {
             checkDeallocation();
             deallocateAll();
             count.set(0);
+            firstAddress = 0;
+            lastAddress = 0;
         } finally {
             locks.unlockAll();
         }
@@ -443,8 +445,12 @@ public final class OffHeapContainer {
     }
 
     public long count() {
+        if (trace) {
+            log.tracef("Cache count");
+        }
+
+        long count = 0;
         if (isTransient) {
-            long size = 0;
             long current = firstAddress;
             while (current != 0) {
                 final long nextAddress = LruNode.getNext(current);
@@ -454,17 +460,20 @@ public final class OffHeapContainer {
                     final byte[] keyBytes = getKeyAt(current);
                     invalidateBytesAt(keyBytes, current);
                 } else {
-                    size++;
+                    count++;
                 }
 
                 current = nextAddress;
             }
-
-            return size;
+        } else {
+            count = this.count.get();
         }
 
+        if (trace) {
+            log.tracef("Cache count returns %d", count);
+        }
 
-        return count.get();
+        return count;
     }
 
     public void invalidate(Object key) {

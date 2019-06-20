@@ -3,6 +3,7 @@ package org.infinispan.quarkus.hibernate.cache;
 import org.hibernate.cache.spi.access.AccessType;
 import org.hibernate.cache.spi.access.EntityDataAccess;
 import org.hibernate.engine.spi.SharedSessionContractImplementor;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.HashMap;
@@ -14,6 +15,7 @@ import static org.junit.Assert.assertEquals;
 public class CacheRegionMaxCountTest {
 
     @Test
+    @Ignore("Object count not initially supported off heap, max size is more relevant")
     public void testMaxSize() {
         final Map configValues = new HashMap();
         configValues.put("hibernate.cache.com.acme.EntityB.memory.object-count", "3");
