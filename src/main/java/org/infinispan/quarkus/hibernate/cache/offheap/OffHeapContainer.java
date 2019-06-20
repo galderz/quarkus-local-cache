@@ -18,7 +18,7 @@ public final class OffHeapContainer {
     // Max would be 1:1 ratio with memory addresses - must be a crazy machine to have that many processors
     private static final int MAX_ADDRESS_COUNT = 1 << 30;
 
-    private static final int ADDRESS_COUNT = 1 << 20;
+    private static final int ADDRESS_COUNT = 1 << 17;
 
     private static final int HEADER_LENGTH = 1 + 4 + 4 + 4;
 
