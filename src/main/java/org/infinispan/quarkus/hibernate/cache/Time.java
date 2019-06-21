@@ -20,6 +20,8 @@ public final class Time {
 
     @FunctionalInterface
     public interface NanosService {
+        NanosService SYSTEM = System::nanoTime;
+
         long nanoTime();
     }
 

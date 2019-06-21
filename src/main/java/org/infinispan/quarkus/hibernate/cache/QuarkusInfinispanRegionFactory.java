@@ -58,7 +58,7 @@ public final class QuarkusInfinispanRegionFactory implements RegionFactory {
             regionTimeService = Time.MillisService.SYSTEM;
 
         if (cacheTimeService == null)
-            cacheTimeService = CaffeineCache.TIME_SERVICE;
+            cacheTimeService = Time.NanosService.SYSTEM;
 
         this.settings = settings;
         this.cacheConfigs = computeCacheConfigs(configValues);
