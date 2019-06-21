@@ -23,6 +23,7 @@ public final class QuarkusInfinispanRegionFactory implements RegionFactory {
 
     private static final String PREFIX = "hibernate.cache.";
     private static final String OBJECT_COUNT_SUFFIX = ".memory.object-count";
+    private static final String MAX_SIZE_SUFFIX = ".memory.max-size";
     private static final String MAX_IDLE_SUFFIX = ".expiration.max-idle";
 
     private final Map<String, InternalCache> caches = new HashMap<>();
@@ -64,7 +65,7 @@ public final class QuarkusInfinispanRegionFactory implements RegionFactory {
     }
 
     private String extractRegionName(int prefixIndexEnd, String key) {
-        final int suffixIndex = Math.max(key.indexOf(OBJECT_COUNT_SUFFIX), key.indexOf(MAX_IDLE_SUFFIX));
+        final int suffixIndex = Math.max(key.indexOf(OBJECT_COUNT_SUFFIX), Math.max(key.indexOf(MAX_IDLE_SUFFIX), key.indexOf(MAX_SIZE_SUFFIX)));
         if (suffixIndex != -1) {
             return key.substring(prefixIndexEnd, suffixIndex);
         }
@@ -216,6 +217,8 @@ public final class QuarkusInfinispanRegionFactory implements RegionFactory {
 
                         if (key.contains(OBJECT_COUNT_SUFFIX)) {
                             cacheConfig.maxObjectCount = Long.parseLong(value);
+                        } else if (key.contains(MAX_SIZE_SUFFIX)) {
+                            cacheConfig.maxMemorySize = Long.parseLong(value);
                         } else if (key.contains(MAX_IDLE_SUFFIX)) {
                             cacheConfig.maxIdle = Duration.ofSeconds(Long.parseLong(value));
                         }
@@ -234,7 +237,7 @@ public final class QuarkusInfinispanRegionFactory implements RegionFactory {
         InternalCacheConfig cacheConfig = new InternalCacheConfig();
         cacheConfig.maxIdle = Duration.ofSeconds(100);
         cacheConfig.maxObjectCount = 10_000;
-        cacheConfig.maxMemorySize = ((1 << 20) * 8) + (1 << 20);
+        cacheConfig.maxMemorySize = 1 << 20;
         return cacheConfig;
     }
 
@@ -244,7 +247,7 @@ public final class QuarkusInfinispanRegionFactory implements RegionFactory {
         InternalCacheConfig cacheConfig = new InternalCacheConfig();
         cacheConfig.maxIdle = Time.forever();
         cacheConfig.maxObjectCount = -1;
-        cacheConfig.maxMemorySize = ((1 << 20) * 8) + (1 << 20);
+        cacheConfig.maxMemorySize = 1 << 20;
         return cacheConfig;
     }
 
@@ -253,7 +256,7 @@ public final class QuarkusInfinispanRegionFactory implements RegionFactory {
         InternalCacheConfig cacheConfig = new InternalCacheConfig();
         cacheConfig.maxIdle = Duration.ofSeconds(100);
         cacheConfig.maxObjectCount = 10_000;
-        cacheConfig.maxMemorySize = ((1 << 20) * 8) + (1 << 20);
+        cacheConfig.maxMemorySize = 1 << 20;
         return cacheConfig;
     }
 
